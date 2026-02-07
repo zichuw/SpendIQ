@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { monthlyHomePlaceholder } from '@/src/mocks/monthly-home';
@@ -153,6 +154,7 @@ function formatPeriodLabel(date: Date, timeframe: Timeframe): string {
 }
 
 export default function InsightsScreen() {
+  const insets = useSafeAreaInsets();
   const [timeframe, setTimeframe] = useState<Timeframe>('monthly');
   const [periodDate, setPeriodDate] = useState<Date>(normalizeDateForTimeframe(BASE_DATE, 'monthly'));
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(BASE.chart[0]?.categoryId ?? null);
@@ -309,7 +311,11 @@ export default function InsightsScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <View style={styles.screen}>
+      <View style={{ height: insets.top, backgroundColor: '#FFFFFF' }} />
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Text style={styles.pageTitle}>Insights</Text>
         <Pressable style={styles.exportButton} onPress={onExportPdf} disabled={isExporting}>
@@ -443,6 +449,7 @@ export default function InsightsScreen() {
         ))}
       </View>
     </ScrollView>
+    </View>
   );
 }
 
@@ -451,9 +458,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  scroll: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 56,
+    paddingTop: 16,
     paddingBottom: 120,
     gap: 12,
   },

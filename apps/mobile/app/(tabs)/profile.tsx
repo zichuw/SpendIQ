@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { InsightReport, listInsightReports } from '@/src/lib/insight-reports';
@@ -16,6 +17,7 @@ function formatDate(iso: string): string {
 }
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<InsightReport[]>([]);
 
   const refreshReports = useCallback(() => {
@@ -29,7 +31,11 @@ export default function ProfileScreen() {
   );
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <View style={styles.screen}>
+      <View style={{ height: insets.top, backgroundColor: '#FFFFFF' }} />
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}>
       <Text style={styles.title}>Profile</Text>
 
       <View style={styles.card}>
@@ -65,6 +71,7 @@ export default function ProfileScreen() {
         )}
       </View>
     </ScrollView>
+    </View>
   );
 }
 
@@ -73,9 +80,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  scroll: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 56,
+    paddingTop: 16,
     paddingBottom: 120,
     gap: 12,
   },
