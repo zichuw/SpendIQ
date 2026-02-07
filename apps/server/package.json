@@ -1,0 +1,9 @@
+{
+  "name": "@spendiq/server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts"
+  }
+}

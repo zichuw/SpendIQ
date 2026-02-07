@@ -1,0 +1,15 @@
+{
+  "name": "spendiq",
+  "private": true,
+  "workspaces": [
+    "apps/mobile",
+    "apps/server",
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile:start": "npm run start --workspace @spendiq/mobile",
+    "mobile:ios": "npm run ios --workspace @spendiq/mobile",
+    "mobile:android": "npm run android --workspace @spendiq/mobile",
+    "server:dev": "npm run dev --workspace @spendiq/server"
+  }
+}
