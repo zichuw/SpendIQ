@@ -58,6 +58,7 @@ function RootLayoutNav() {
           <StatusBar style="dark" backgroundColor="#FFFFFF" />
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="transactions" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </Stack>
         </ThemeProvider>
