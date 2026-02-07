@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { fetchInsights, InsightCard as ApiInsightCard } from '@/src/lib/api';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -169,7 +170,10 @@ export default function InsightsScreen() {
   const [periodDate, setPeriodDate] = useState<Date>(getCurrentPeriodDate('monthly'));
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(BASE.chart[0]?.categoryId ?? null);
   const [isExporting, setIsExporting] = useState(false);
+  const [insightCards, setInsightCards] = useState<ApiInsightCard[]>([]);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
 
+  
   const onChangeTimeframe = (nextTimeframe: Timeframe) => {
     setTimeframe(nextTimeframe);
     setPeriodDate((prev) => clampToCurrentPeriod(prev, nextTimeframe));
@@ -244,7 +248,7 @@ export default function InsightsScreen() {
       ? `At this pace, you'll end ${timeframe === 'weekly' ? 'the week' : timeframe} ${formatMoney(projectionDelta)} over.`
       : `At this pace, you'll finish ${timeframe === 'weekly' ? 'the week' : timeframe} under budget.`;
 
-  const insightCards = [
+  const getMockInsights = (): ApiInsightCard[] => [
     {
       kind: 'alert',
       title: projectionText,
@@ -273,7 +277,31 @@ export default function InsightsScreen() {
       body: 'No subscription creep detected; this stability supports long-term budget control.',
       action: 'Keep doing this: review active subscriptions monthly before renewal dates.',
     },
-  ] as const;
+  ];
+
+  // Fetch AI insights when month changes (only for monthly view)
+  useEffect(() => {
+    if (timeframe === 'monthly') {
+      setIsLoadingInsights(true);
+      const monthString = periodDate.toISOString().split('T')[0].substring(0, 7); // YYYY-MM format
+      fetchInsights(monthString)
+        .then((insights) => {
+          if (insights.length > 0) {
+            setInsightCards(insights);
+          } else {
+            // Fallback to mock insights if API returns empty
+            setInsightCards(getMockInsights());
+          }
+        })
+        .catch(() => {
+          // Fallback to mock insights on error
+          setInsightCards(getMockInsights());
+        })
+        .finally(() => {
+          setIsLoadingInsights(false);
+        });
+    }
+  }, [periodDate, timeframe]);
 
   const onExportPdf = async () => {
     try {
@@ -336,6 +364,7 @@ export default function InsightsScreen() {
         </Pressable>
       </View>
 
+      
       <View style={styles.timeframeRow}>
         {TIMEFRAME_OPTIONS.map((option) => {
           const selected = option.id === timeframe;
