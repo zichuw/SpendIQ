@@ -2,5 +2,9 @@
   "name": "@spendiq/shared",
   "version": "1.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api-contracts": "./src/api-contracts.ts"
+  }
 }
