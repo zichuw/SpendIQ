@@ -12,6 +12,7 @@ import transactionRoutes from "./routes/transactions";
 import categoryRoutes from "./routes/categories";
 import userSettingsRoutes from "./routes/user-settings";
 import syncRoutes from "./routes/sync";
+import aiRoutes from "./routes/ai";
 
 import { Pool } from "pg";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -33,6 +34,7 @@ app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/home", homeRoutes);
 app.use("/api/v1/user-settings", userSettingsRoutes);
 app.use("/api/v1/sync", syncRoutes);
+app.use("/api/v1/ai", aiRoutes);
 
 app.get('/', (_, res) => res.send('Spendiq backend running'));
 
