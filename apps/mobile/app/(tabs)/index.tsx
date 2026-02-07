@@ -98,9 +98,6 @@ export default function HomeScreen() {
       style={styles.scroll}
       contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
-        <View style={styles.brandIconWrap}>
-          <MaterialCommunityIcons name="cash-multiple" size={30} color="#111111" />
-        </View>
         <Pressable
           style={styles.monthButton}
           onPress={() => {
@@ -258,7 +255,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   brandIconWrap: {
     width: 66,
