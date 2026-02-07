@@ -11,7 +11,7 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F7F6' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
   title: { fontSize: 24, fontWeight: '700', color: '#234041' },
   body: { marginTop: 8, color: '#5A6D6B' },
 });
