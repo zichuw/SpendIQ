@@ -43,10 +43,10 @@ export const monthlyHomePlaceholder: MonthlyHomeData = {
     spentPct: 75.01,
   },
   chart: [
-    { categoryId: 2, categoryName: 'Fixed', spent: 1720, color: '#4A6C8C' },
-    { categoryId: 3, categoryName: 'Everyday', spent: 860.5, color: '#6FA8DC' },
-    { categoryId: 4, categoryName: 'Lifestyle', spent: 980, color: '#9FC5A8' },
-    { categoryId: 5, categoryName: 'Miscellaneous', spent: 190, color: '#B7B7B7' },
+    { categoryId: 2, categoryName: 'Fixed', spent: 1720, color: '#1A3A2A' },
+    { categoryId: 3, categoryName: 'Everyday', spent: 860.5, color: '#8FAE7E' },
+    { categoryId: 4, categoryName: 'Lifestyle', spent: 980, color: '#6B7C52' },
+    { categoryId: 5, categoryName: 'Miscellaneous', spent: 190, color: '#94A3B8' },
   ],
   lines: [
     {

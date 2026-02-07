@@ -1,5 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/Themed';
@@ -12,9 +14,14 @@ const RING_SIZE = 160;
 const STROKE_WIDTH = 18;
 const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
+}
+
+function displayCategoryName(name: string): string {
+  return name === 'Miscellaneous' ? 'Misc' : name;
 }
 
 function SpendingDonut() {
@@ -65,18 +72,34 @@ function SpendingDonut() {
 }
 
 export default function HomeScreen() {
+  const [selectedMonthDate, setSelectedMonthDate] = useState(new Date(2026, 1, 1));
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+  const [pickerYear, setPickerYear] = useState(selectedMonthDate.getFullYear());
   const groupedLines = CATEGORY_ORDER.map((categoryName) => ({
     categoryName,
     lines: data.lines.filter((line) => line.parentCategoryName === categoryName),
   })).filter((group) => group.lines.length > 0);
 
-  const categoryColor = new Map(data.chart.map((slice) => [slice.categoryName, slice.color]));
+  const monthLabel = selectedMonthDate.toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
+    <>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
-        <Pressable style={styles.monthButton}>
-          <Text style={styles.monthButtonText}>SpendIQ / February 2026</Text>
+        <View style={styles.brandIconWrap}>
+          <MaterialCommunityIcons name="cash-multiple" size={30} color="#111111" />
+        </View>
+        <Pressable
+          style={styles.monthButton}
+          onPress={() => {
+            setPickerYear(selectedMonthDate.getFullYear());
+            setMonthPickerVisible(true);
+          }}>
+          <Text style={styles.monthButtonText}>{monthLabel}</Text>
+          <FontAwesome name="calendar-o" size={16} color="#111111" />
         </Pressable>
         <Pressable style={styles.iconButton}>
           <FontAwesome name="plus" size={16} color="#294C4A" />
@@ -98,7 +121,7 @@ export default function HomeScreen() {
             {data.chart.map((slice) => (
               <View style={styles.legendRow} key={slice.categoryId}>
                 <View style={[styles.legendDot, { backgroundColor: slice.color }]} />
-                <Text style={styles.legendText}>{slice.categoryName}</Text>
+                <Text style={styles.legendText}>{displayCategoryName(slice.categoryName)}</Text>
                 <Text style={styles.legendAmount}>{formatMoney(slice.spent)}</Text>
               </View>
             ))}
@@ -108,7 +131,7 @@ export default function HomeScreen() {
 
       {groupedLines.map((group) => (
         <View style={styles.card} key={group.categoryName}>
-          <Text style={styles.cardTitle}>{group.categoryName}</Text>
+          <Text style={styles.cardTitle}>{displayCategoryName(group.categoryName)}</Text>
           {group.lines.map((line) => (
             <Pressable key={line.categoryId} style={styles.lineItem}>
               <View style={styles.lineTopRow}>
@@ -121,7 +144,7 @@ export default function HomeScreen() {
                     styles.progressFill,
                     {
                       width: `${Math.min(line.progressPct, 100)}%`,
-                      backgroundColor: categoryColor.get(group.categoryName) ?? '#6EA68B',
+                      backgroundColor: '#6EA68B',
                     },
                   ]}
                 />
@@ -145,13 +168,63 @@ export default function HomeScreen() {
         <Text style={styles.helperText}>Tap any subcategory to drill into spending details.</Text>
       </View>
     </ScrollView>
+    <Modal
+      visible={monthPickerVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setMonthPickerVisible(false)}>
+      <View style={styles.monthModalOverlay}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setMonthPickerVisible(false)}
+        />
+        <View style={styles.monthModalCard}>
+          <View style={styles.monthModalHeader}>
+            <Pressable
+              style={styles.yearArrowButton}
+              onPress={() => setPickerYear((year) => year - 1)}>
+              <FontAwesome name="chevron-left" size={14} color="#294C4A" />
+            </Pressable>
+            <Text style={styles.monthModalYear}>{pickerYear}</Text>
+            <Pressable
+              style={styles.yearArrowButton}
+              onPress={() => setPickerYear((year) => year + 1)}>
+              <FontAwesome name="chevron-right" size={14} color="#294C4A" />
+            </Pressable>
+          </View>
+
+          <View style={styles.monthGrid}>
+            {MONTH_NAMES.map((monthName, monthIndex) => {
+              const isSelected =
+                selectedMonthDate.getFullYear() === pickerYear &&
+                selectedMonthDate.getMonth() === monthIndex;
+
+              return (
+                <Pressable
+                  key={monthName}
+                  style={[styles.monthCell, isSelected && styles.monthCellSelected]}
+                  onPress={() => {
+                    setSelectedMonthDate(new Date(pickerYear, monthIndex, 1));
+                    setMonthPickerVisible(false);
+                  }}>
+                  <Text style={[styles.monthCellText, isSelected && styles.monthCellTextSelected]}>
+                    {monthName}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F2F7F6',
+    backgroundColor: '#FFFFFF',
   },
   content: {
     paddingHorizontal: 16,
@@ -163,19 +236,96 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  brandIconWrap: {
+    width: 66,
+    height: 66,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8ECEC',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
   monthButton: {
-    borderWidth: 1,
-    borderColor: '#BFD1CF',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   monthButtonText: {
     color: '#111111',
-    fontSize: 16,
+    fontSize: 28,
+    fontWeight: '400',
+    fontFamily: 'NotoSerifKR-Regular',
+  },
+  monthModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 17, 17, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  monthModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#DCE8E7',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    gap: 14,
+  },
+  monthModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  yearArrowButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#DCE8E7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7FAF9',
+  },
+  monthModalYear: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  monthCell: {
+    width: '31%',
+    minWidth: 90,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCE8E7',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthCellSelected: {
+    backgroundColor: '#DDECEA',
+    borderColor: '#6EA68B',
+  },
+  monthCellText: {
+    color: '#294C4A',
+    fontSize: 15,
     fontWeight: '600',
+  },
+  monthCellTextSelected: {
+    color: '#1D3E3C',
   },
   iconButton: {
     width: 36,
