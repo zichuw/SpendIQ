@@ -19,5 +19,10 @@
     "server:dev": "pnpm --filter @spendiq/server dev",
     "server:start": "pnpm --filter @spendiq/server start",
     "typecheck": "pnpm -r typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

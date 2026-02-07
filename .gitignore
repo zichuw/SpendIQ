@@ -13,4 +13,6 @@ coverage
 .env
 .env.*
 !.env.example
+
+package-lock.json
 apps/server/.env
