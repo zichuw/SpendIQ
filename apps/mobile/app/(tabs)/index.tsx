@@ -1,16 +1,77 @@
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/Themed';
 import { monthlyHomePlaceholder } from '@/src/mocks/monthly-home';
 
 const data = monthlyHomePlaceholder;
+const CATEGORY_ORDER = ['Fixed', 'Everyday', 'Lifestyle', 'Miscellaneous'];
+
+const RING_SIZE = 160;
+const STROKE_WIDTH = 18;
+const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+function SpendingDonut() {
+  const total = data.chart.reduce((sum, slice) => sum + slice.spent, 0) || 1;
+  let cumulative = 0;
+
+  return (
+    <View style={styles.ringChartWrap}>
+      <Svg width={RING_SIZE} height={RING_SIZE}>
+        <Circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RADIUS}
+          stroke="#E3ECEA"
+          strokeWidth={STROKE_WIDTH}
+          fill="transparent"
+        />
+        {data.chart.map((slice) => {
+          const fraction = slice.spent / total;
+          const segmentLength = fraction * CIRCUMFERENCE;
+          const segmentVisible = Math.max(segmentLength - 2, 0);
+          const offset = CIRCUMFERENCE * (1 - cumulative);
+          cumulative += fraction;
+
+          return (
+            <Circle
+              key={slice.categoryId}
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RADIUS}
+              stroke={slice.color}
+              strokeWidth={STROKE_WIDTH}
+              strokeLinecap="round"
+              fill="transparent"
+              strokeDasharray={`${segmentVisible} ${CIRCUMFERENCE}`}
+              strokeDashoffset={offset}
+              transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
+            />
+          );
+        })}
+      </Svg>
+      <View style={styles.ringInner}>
+        <Text style={styles.ringValue}>{formatMoney(data.summary.spentTotal)}</Text>
+        <Text style={styles.ringSubtext}>spent this month</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
+  const groupedLines = CATEGORY_ORDER.map((categoryName) => ({
+    categoryName,
+    lines: data.lines.filter((line) => line.parentCategoryName === categoryName),
+  })).filter((group) => group.lines.length > 0);
+
+  const categoryColor = new Map(data.chart.map((slice) => [slice.categoryName, slice.color]));
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
@@ -32,12 +93,7 @@ export default function HomeScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Spending Overview</Text>
         <View style={styles.ringWrap}>
-          <View style={styles.ringOuter}>
-            <View style={styles.ringInner}>
-              <Text style={styles.ringValue}>{formatMoney(data.summary.spentTotal)}</Text>
-              <Text style={styles.ringSubtext}>spent this month</Text>
-            </View>
-          </View>
+          <SpendingDonut />
           <View style={styles.legend}>
             {data.chart.map((slice) => (
               <View style={styles.legendRow} key={slice.categoryId}>
@@ -50,28 +106,38 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Lifestyle</Text>
-        {data.lines.map((line) => (
-          <Pressable key={line.categoryId} style={styles.lineItem}>
-            <View style={styles.lineTopRow}>
-              <Text style={styles.lineTitle}>{line.categoryName}</Text>
-              <Text style={styles.linePlanned}>Planned {formatMoney(line.planned)}</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.min(line.progressPct, 100)}%` }]} />
-            </View>
-            <View style={styles.lineMetaRow}>
-              <Text style={styles.lineMeta}>Spent {formatMoney(line.spent)}</Text>
-              <Text style={styles.lineMeta}>Remaining {formatMoney(line.remaining)}</Text>
-            </View>
+      {groupedLines.map((group) => (
+        <View style={styles.card} key={group.categoryName}>
+          <Text style={styles.cardTitle}>{group.categoryName}</Text>
+          {group.lines.map((line) => (
+            <Pressable key={line.categoryId} style={styles.lineItem}>
+              <View style={styles.lineTopRow}>
+                <Text style={styles.lineTitle}>{line.categoryName}</Text>
+                <Text style={styles.linePlanned}>Planned {formatMoney(line.planned)}</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.min(line.progressPct, 100)}%`,
+                      backgroundColor: categoryColor.get(group.categoryName) ?? '#6EA68B',
+                    },
+                  ]}
+                />
+              </View>
+              <View style={styles.lineMetaRow}>
+                <Text style={styles.lineMeta}>Spent {formatMoney(line.spent)}</Text>
+                <Text style={styles.lineMeta}>Remaining {formatMoney(line.remaining)}</Text>
+              </View>
+            </Pressable>
+          ))}
+          <Pressable style={styles.addRow}>
+            <FontAwesome name="plus-circle" size={16} color="#2D6A4F" />
+            <Text style={styles.addText}>Add subcategory</Text>
           </Pressable>
-        ))}
-        <Pressable style={styles.addRow}>
-          <FontAwesome name="plus-circle" size={16} color="#2D6A4F" />
-          <Text style={styles.addText}>Add subcategory</Text>
-        </Pressable>
-      </View>
+        </View>
+      ))}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Sync + Guidance</Text>
@@ -148,17 +214,14 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: 'center',
   },
-  ringOuter: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 18,
-    borderColor: '#CFE1DE',
+  ringChartWrap: {
+    width: RING_SIZE,
+    height: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EAF2F1',
   },
   ringInner: {
+    position: 'absolute',
     width: 90,
     height: 90,
     borderRadius: 45,
@@ -228,7 +291,6 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#6EA68B',
   },
   lineMetaRow: {
     flexDirection: 'row',
