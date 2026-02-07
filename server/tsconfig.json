@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",             // modern JS features
+    "module": "commonjs",           // use CommonJS for ts-node
+    "moduleResolution": "node",     // standard Node module resolution
+    "esModuleInterop": true,        // allows `import express from 'express'`
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,                 // strict TS checks
+    "skipLibCheck": true            // skip type checking of node_modules
+  },
+  "include": ["src"]                // compile all TS files in src/
+}
