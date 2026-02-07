@@ -2,6 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/Themed';
@@ -72,6 +73,10 @@ function SpendingDonut() {
 }
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
   const [selectedMonthDate, setSelectedMonthDate] = useState(new Date(2026, 1, 1));
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(selectedMonthDate.getFullYear());
@@ -87,7 +92,11 @@ export default function HomeScreen() {
 
   return (
     <>
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <View style={styles.screen}>
+    <View style={{ height: insets.top, backgroundColor: '#FFFFFF' }} />
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <View style={styles.brandIconWrap}>
           <MaterialCommunityIcons name="cash-multiple" size={30} color="#111111" />
@@ -95,7 +104,7 @@ export default function HomeScreen() {
         <Pressable
           style={styles.monthButton}
           onPress={() => {
-            setPickerYear(selectedMonthDate.getFullYear());
+            setPickerYear(Math.min(selectedMonthDate.getFullYear(), currentYear));
             setMonthPickerVisible(true);
           }}>
           <Text style={styles.monthButtonText}>{monthLabel}</Text>
@@ -168,6 +177,7 @@ export default function HomeScreen() {
         <Text style={styles.helperText}>Tap any subcategory to drill into spending details.</Text>
       </View>
     </ScrollView>
+    </View>
     <Modal
       visible={monthPickerVisible}
       transparent
@@ -187,8 +197,9 @@ export default function HomeScreen() {
             </Pressable>
             <Text style={styles.monthModalYear}>{pickerYear}</Text>
             <Pressable
-              style={styles.yearArrowButton}
-              onPress={() => setPickerYear((year) => year + 1)}>
+              style={[styles.yearArrowButton, pickerYear >= currentYear && styles.disabledButton]}
+              disabled={pickerYear >= currentYear}
+              onPress={() => setPickerYear((year) => Math.min(year + 1, currentYear))}>
               <FontAwesome name="chevron-right" size={14} color="#294C4A" />
             </Pressable>
           </View>
@@ -198,11 +209,18 @@ export default function HomeScreen() {
               const isSelected =
                 selectedMonthDate.getFullYear() === pickerYear &&
                 selectedMonthDate.getMonth() === monthIndex;
+              const isFutureMonth =
+                pickerYear > currentYear || (pickerYear === currentYear && monthIndex > currentMonth);
 
               return (
                 <Pressable
                   key={monthName}
-                  style={[styles.monthCell, isSelected && styles.monthCellSelected]}
+                  style={[
+                    styles.monthCell,
+                    isSelected && styles.monthCellSelected,
+                    isFutureMonth && styles.disabledButton,
+                  ]}
+                  disabled={isFutureMonth}
                   onPress={() => {
                     setSelectedMonthDate(new Date(pickerYear, monthIndex, 1));
                     setMonthPickerVisible(false);
@@ -226,9 +244,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  scroll: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 56,
+    paddingTop: 16,
     paddingBottom: 120,
     gap: 14,
   },
@@ -326,6 +348,9 @@ const styles = StyleSheet.create({
   },
   monthCellTextSelected: {
     color: '#1D3E3C',
+  },
+  disabledButton: {
+    opacity: 0.4,
   },
   iconButton: {
     width: 36,
