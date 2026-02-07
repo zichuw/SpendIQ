@@ -1,15 +1,15 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/Themed';
+import { ApiMonthlyHome, getDefaultUserId, getMonthlyHome } from '@/src/lib/api';
 import { monthlyHomePlaceholder } from '@/src/mocks/monthly-home';
 
-const data = monthlyHomePlaceholder;
 const CATEGORY_ORDER = ['Fixed', 'Everyday', 'Lifestyle', 'Miscellaneous'];
 
 const RING_SIZE = 160;
@@ -26,7 +26,26 @@ function displayCategoryName(name: string): string {
   return name === 'Miscellaneous' ? 'Misc' : name;
 }
 
-function SpendingDonut() {
+function formatMonthKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function formatSyncTime(value: string | null): string {
+  if (!value) return 'Never';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function SpendingDonut({ data }: { data: ApiMonthlyHome }) {
   const total = data.chart.reduce((sum, slice) => sum + slice.spent, 0) || 1;
   let cumulative = 0;
 
@@ -79,13 +98,56 @@ export default function HomeScreen() {
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
-  const [selectedMonthDate, setSelectedMonthDate] = useState(new Date(2026, 1, 1));
+  const [selectedMonthDate, setSelectedMonthDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(selectedMonthDate.getFullYear());
-  const groupedLines = CATEGORY_ORDER.map((categoryName) => ({
-    categoryName,
-    lines: data.lines.filter((line) => line.parentCategoryName === categoryName),
-  })).filter((group) => group.lines.length > 0);
+  const [data, setData] = useState<ApiMonthlyHome | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isFallback, setIsFallback] = useState(false);
+  const selectedMonthKey = useMemo(() => formatMonthKey(selectedMonthDate), [selectedMonthDate]);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadMonthlyHome = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const home = await getMonthlyHome(getDefaultUserId(), selectedMonthKey);
+        if (!isActive) return;
+        setData(home);
+        setIsFallback(false);
+      } catch (err) {
+        if (!isActive) return;
+        const fallbackData: ApiMonthlyHome = {
+          ...monthlyHomePlaceholder,
+          lines: monthlyHomePlaceholder.lines.map((line) => ({
+            ...line,
+            parentCategoryName: line.parentCategoryName ?? line.categoryName,
+          })),
+        };
+        setData(fallbackData);
+        setIsFallback(true);
+        setError(err instanceof Error ? err.message : 'Unable to load data');
+      } finally {
+        if (isActive) setIsLoading(false);
+      }
+    };
+
+    loadMonthlyHome();
+    return () => {
+      isActive = false;
+    };
+  }, [selectedMonthKey]);
+
+  const groupedLines = useMemo(
+    () =>
+      CATEGORY_ORDER.map((categoryName) => ({
+        categoryName,
+        lines: data?.lines.filter((line) => line.parentCategoryName === categoryName) ?? [],
+      })).filter((group) => group.lines.length > 0),
+    [data]
+  );
 
   const monthLabel = selectedMonthDate.toLocaleDateString('en-US', {
     month: 'long',
@@ -116,61 +178,92 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.budgetRow}>
-        <Text style={styles.budgetLabel}>Monthly Budget: {formatMoney(data.summary.budgetTotal)}</Text>
+        <Text style={styles.budgetLabel}>
+          Monthly Budget: {formatMoney(data?.summary.budgetTotal ?? 0)}
+        </Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Spending Overview</Text>
-        <View style={styles.ringWrap}>
-          <SpendingDonut />
-          <View style={styles.legend}>
-            {data.chart.map((slice) => (
-              <View style={styles.legendRow} key={slice.categoryId}>
-                <View style={[styles.legendDot, { backgroundColor: slice.color }]} />
-                <Text style={styles.legendText}>{displayCategoryName(slice.categoryName)}</Text>
-                <Text style={styles.legendAmount}>{formatMoney(slice.spent)}</Text>
+      {isLoading ? (
+        <View style={styles.card}>
+          <Text style={styles.helperText}>Loading monthly data...</Text>
+        </View>
+      ) : error && !data ? (
+        <View style={styles.card}>
+          <Text style={styles.helperText}>Could not load monthly data: {error}</Text>
+        </View>
+      ) : !data ? (
+        <View style={styles.card}>
+          <Text style={styles.helperText}>No data available for this month.</Text>
+        </View>
+      ) : (
+        <>
+          {isFallback && (
+            <View style={styles.card}>
+              <Text style={styles.helperText}>
+                Using demo data (API unavailable: {error ?? 'unknown error'}).
+              </Text>
+            </View>
+          )}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Spending Overview</Text>
+            <View style={styles.ringWrap}>
+              <SpendingDonut data={data} />
+              <View style={styles.legend}>
+                {data.chart.length === 0 ? (
+                  <Text style={styles.helperText}>No spending recorded for this month.</Text>
+                ) : (
+                  data.chart.map((slice) => (
+                    <View style={styles.legendRow} key={slice.categoryId}>
+                      <View style={[styles.legendDot, { backgroundColor: slice.color }]} />
+                      <Text style={styles.legendText}>{displayCategoryName(slice.categoryName)}</Text>
+                      <Text style={styles.legendAmount}>{formatMoney(slice.spent)}</Text>
+                    </View>
+                  ))
+                )}
               </View>
-            ))}
+            </View>
           </View>
-        </View>
-      </View>
 
-      {groupedLines.map((group) => (
-        <View style={styles.card} key={group.categoryName}>
-          <Text style={styles.cardTitle}>{displayCategoryName(group.categoryName)}</Text>
-          {group.lines.map((line) => (
-            <Pressable key={line.categoryId} style={styles.lineItem}>
-              <View style={styles.lineTopRow}>
-                <Text style={styles.lineTitle}>{line.categoryName}</Text>
-                <Text style={styles.linePlanned}>Planned {formatMoney(line.planned)}</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${Math.min(line.progressPct, 100)}%`,
-                      backgroundColor: '#6EA68B',
-                    },
-                  ]}
-                />
-              </View>
-              <View style={styles.lineMetaRow}>
-                <Text style={styles.lineMeta}>Spent {formatMoney(line.spent)}</Text>
-                <Text style={styles.lineMeta}>Remaining {formatMoney(line.remaining)}</Text>
-              </View>
-            </Pressable>
+          {groupedLines.map((group) => (
+            <View style={styles.card} key={group.categoryName}>
+              <Text style={styles.cardTitle}>{displayCategoryName(group.categoryName)}</Text>
+              {group.lines.map((line) => (
+                <Pressable key={line.categoryId} style={styles.lineItem}>
+                  <View style={styles.lineTopRow}>
+                    <Text style={styles.lineTitle}>{line.categoryName}</Text>
+                    <Text style={styles.linePlanned}>Planned {formatMoney(line.planned)}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${Math.min(line.progressPct, 100)}%`,
+                          backgroundColor: '#6EA68B',
+                        },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.lineMetaRow}>
+                    <Text style={styles.lineMeta}>Spent {formatMoney(line.spent)}</Text>
+                    <Text style={styles.lineMeta}>Remaining {formatMoney(line.remaining)}</Text>
+                  </View>
+                </Pressable>
+              ))}
+              <Pressable style={styles.addRow}>
+                <FontAwesome name="plus-circle" size={16} color="#2D6A4F" />
+                <Text style={styles.addText}>Add subcategory</Text>
+              </Pressable>
+            </View>
           ))}
-          <Pressable style={styles.addRow}>
-            <FontAwesome name="plus-circle" size={16} color="#2D6A4F" />
-            <Text style={styles.addText}>Add subcategory</Text>
-          </Pressable>
-        </View>
-      ))}
+        </>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Sync + Guidance</Text>
-        <Text style={styles.helperText}>Last bank sync: {data.sync.lastTransactionSyncAt}</Text>
+        <Text style={styles.helperText}>
+          Last bank sync: {formatSyncTime(data?.sync.lastTransactionSyncAt ?? null)}
+        </Text>
         <Text style={styles.helperText}>Tap any subcategory to drill into spending details.</Text>
       </View>
     </ScrollView>
