@@ -63,6 +63,12 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="user-o" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="ai-settings"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
