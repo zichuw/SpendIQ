@@ -16,3 +16,4 @@ coverage
 
 package-lock.json
 apps/server/.env
+LLM_INTEGRATION_GUIDE.md

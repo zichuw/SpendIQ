@@ -23,6 +23,7 @@ router.get("/:user_id", async (req, res) => {
               status_on_track_max, status_tight_max, baseline_months,
               include_pending_in_insights, insights_enabled,
               encouragement_insights_enabled, spike_alert_threshold_pct,
+              ai_personalities, ai_frugal_score, ai_advice_score,
               created_at, updated_at
        FROM user_settings
        WHERE user_id = $1`,
@@ -40,7 +41,11 @@ router.get("/:user_id", async (req, res) => {
       });
     }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    res.json({
+      ...row,
+      ai_personalities: row.ai_personalities ? JSON.parse(row.ai_personalities) : DEFAULT_USER_SETTINGS.ai_personalities,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Error fetching user settings:", message);
@@ -66,18 +71,23 @@ router.post("/:user_id", async (req, res) => {
     // Merge with defaults
     const merged = { ...DEFAULT_USER_SETTINGS, ...settings };
 
+    // Convert ai_personalities array to JSON string for storage
+    const aiPersonalitiesJson = JSON.stringify(merged.ai_personalities);
+
     const result = await pool.query(
       `INSERT INTO user_settings (
         user_id, timezone, currency_code, week_starts_on,
         status_on_track_max, status_tight_max, baseline_months,
         include_pending_in_insights, insights_enabled,
-        encouragement_insights_enabled, spike_alert_threshold_pct
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        encouragement_insights_enabled, spike_alert_threshold_pct,
+        ai_personalities, ai_frugal_score, ai_advice_score
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (user_id) DO NOTHING
        RETURNING id, user_id, timezone, currency_code, week_starts_on,
                  status_on_track_max, status_tight_max, baseline_months,
                  include_pending_in_insights, insights_enabled,
                  encouragement_insights_enabled, spike_alert_threshold_pct,
+                 ai_personalities, ai_frugal_score, ai_advice_score,
                  created_at, updated_at`,
       [
         user_id,
@@ -91,6 +101,9 @@ router.post("/:user_id", async (req, res) => {
         merged.insights_enabled,
         merged.encouragement_insights_enabled,
         merged.spike_alert_threshold_pct,
+        aiPersonalitiesJson,
+        merged.ai_frugal_score,
+        merged.ai_advice_score,
       ]
     );
 
@@ -101,14 +114,23 @@ router.post("/:user_id", async (req, res) => {
                 status_on_track_max, status_tight_max, baseline_months,
                 include_pending_in_insights, insights_enabled,
                 encouragement_insights_enabled, spike_alert_threshold_pct,
+                ai_personalities, ai_frugal_score, ai_advice_score,
                 created_at, updated_at
          FROM user_settings WHERE user_id = $1`,
         [user_id]
       );
-      return res.status(200).json(fetch.rows[0]);
+      const row = fetch.rows[0];
+      return res.status(200).json({
+        ...row,
+        ai_personalities: row.ai_personalities ? JSON.parse(row.ai_personalities) : DEFAULT_USER_SETTINGS.ai_personalities,
+      });
     }
 
-    res.status(201).json(result.rows[0]);
+    const row = result.rows[0];
+    res.status(201).json({
+      ...row,
+      ai_personalities: row.ai_personalities ? JSON.parse(row.ai_personalities) : DEFAULT_USER_SETTINGS.ai_personalities,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Error creating user settings:", message);
@@ -133,10 +155,22 @@ router.patch("/:user_id", async (req, res) => {
   try {
     // Build dynamic UPDATE query
     const allowedFields = Object.keys(updates);
-    const setClause = allowedFields
+    
+    // Convert ai_personalities array to JSON string if present
+    const processedUpdates: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      const value = (updates as Record<string, unknown>)[field];
+      if (field === "ai_personalities" && Array.isArray(value)) {
+        processedUpdates[field] = JSON.stringify(value);
+      } else {
+        processedUpdates[field] = value;
+      }
+    }
+
+    const setClause = Object.keys(processedUpdates)
       .map((field, idx) => `${field} = $${idx + 2}`)
       .join(", ");
-    const values = [user_id, ...Object.values(updates)];
+    const values = [user_id, ...Object.values(processedUpdates)];
 
     const result = await pool.query(
       `UPDATE user_settings
@@ -146,6 +180,7 @@ router.patch("/:user_id", async (req, res) => {
                  status_on_track_max, status_tight_max, baseline_months,
                  include_pending_in_insights, insights_enabled,
                  encouragement_insights_enabled, spike_alert_threshold_pct,
+                 ai_personalities, ai_frugal_score, ai_advice_score,
                  created_at, updated_at`,
       values
     );
@@ -154,7 +189,11 @@ router.patch("/:user_id", async (req, res) => {
       return res.status(404).json({ error: "User settings not found" });
     }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    res.json({
+      ...row,
+      ai_personalities: row.ai_personalities ? JSON.parse(row.ai_personalities) : DEFAULT_USER_SETTINGS.ai_personalities,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Error updating user settings:", message);

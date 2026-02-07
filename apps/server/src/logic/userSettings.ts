@@ -14,6 +14,9 @@ export interface UserSettings {
   insights_enabled: boolean;
   encouragement_insights_enabled: boolean;
   spike_alert_threshold_pct: number;
+  ai_personalities: string[]; // JSON array stored as string "[]"
+  ai_frugal_score: number;
+  ai_advice_score: number;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +32,9 @@ export const DEFAULT_USER_SETTINGS = {
   insights_enabled: true,
   encouragement_insights_enabled: true,
   spike_alert_threshold_pct: 0.25,
+  ai_personalities: ["nice"],
+  ai_frugal_score: 55,
+  ai_advice_score: 60,
 };
 
 /**
@@ -52,8 +58,12 @@ export function validateSettingsUpdate(
     "insights_enabled",
     "encouragement_insights_enabled",
     "spike_alert_threshold_pct",
+    "ai_personalities",
+    "ai_frugal_score",
+    "ai_advice_score",
   ];
 
   const keys = Object.keys(update);
   return keys.every((k) => allowed.includes(k));
 }
+
