@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   monthButtonText: {
-    color: '#234041',
+    color: '#111111',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   budgetLabel: {
-    color: '#234041',
+    color: '#111111',
     fontSize: 22,
     fontWeight: '700',
   },
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#264847',
+    color: '#111111',
   },
   ringWrap: {
     flexDirection: 'row',
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   },
   ringValue: {
     fontWeight: '700',
-    color: '#173635',
+    color: '#111111',
     fontSize: 14,
     textAlign: 'center',
   },
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     flex: 1,
-    color: '#315351',
+    color: '#111111',
     fontSize: 13,
   },
   legendAmount: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   lineTitle: {
-    color: '#244B48',
+    color: '#111111',
     fontWeight: '600',
     fontSize: 15,
   },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addText: {
-    color: '#2D6A4F',
+    color: '#111111',
     fontWeight: '600',
   },
   helperText: {
