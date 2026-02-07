@@ -27,6 +27,20 @@ router.get("/:user_id", async (req, res) => {
       period_end = `${y}-${String(m).padStart(2, "0")}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
     }
 
+    // Fetch user settings (include_pending_in_insights, status thresholds)
+    const settingsRes = await pool.query(
+      `SELECT include_pending_in_insights, status_on_track_max, status_tight_max
+       FROM user_settings
+       WHERE user_id = $1`,
+      [user_id]
+    );
+
+    const settings = settingsRes.rows[0] ?? {
+      include_pending_in_insights: false,
+      status_on_track_max: 0.85,
+      status_tight_max: 1.0,
+    };
+
     // 1. Budget lines for this period (single budget per user per period_start)
     const budgetRes = await pool.query(
       `SELECT b.id AS budget_id
@@ -56,6 +70,11 @@ router.get("/:user_id", async (req, res) => {
     }));
 
     // 2. Spent per category in period (debits only, via transaction_categories)
+    // Respect include_pending_in_insights setting
+    const pendingClause = settings.include_pending_in_insights
+      ? "" // Include all transactions
+      : "AND t.pending = FALSE"; // Exclude pending transactions
+
     const spentRes = await pool.query(
       `SELECT tc.category_id, SUM(t.amount) AS spent
        FROM transactions t
@@ -64,6 +83,7 @@ router.get("/:user_id", async (req, res) => {
          AND t.transaction_date >= $2::date
          AND t.transaction_date <= $3::date
          AND t.direction = 'debit'
+         ${pendingClause}
        GROUP BY tc.category_id`,
       [user_id, period_start, period_end]
     );
@@ -73,7 +93,12 @@ router.get("/:user_id", async (req, res) => {
       spent: Number(r.spent),
     }));
 
-    const insights = computeInsights(budgetLines, spentByCategory);
+    const insights = computeInsights(
+      budgetLines,
+      spentByCategory,
+      settings.status_on_track_max,
+      settings.status_tight_max
+    );
     res.json(insights);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
