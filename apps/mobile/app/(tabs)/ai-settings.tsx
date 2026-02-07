@@ -160,7 +160,6 @@ export default function AiSettingsScreen() {
         <View style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={() => router.replace('/(tabs)/chat' as never)}>
             <FontAwesome name="chevron-left" size={14} color="#123B3A" />
-            <Text style={styles.backButtonText}>Back</Text>
           </Pressable>
           <Text style={styles.title}>AI Settings</Text>
         </View>
@@ -275,24 +274,21 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   headerRow: {
-    gap: 10,
+    position: 'relative',
+    minHeight: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 28,
+    height: 28,
+    marginTop: 1,
     alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#D5E4E2',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: '#FFFFFF',
-  },
-  backButtonText: {
-    color: '#123B3A',
-    fontSize: 14,
-    fontWeight: '700',
+    justifyContent: 'center',
   },
   title: {
     color: '#123B3A',
