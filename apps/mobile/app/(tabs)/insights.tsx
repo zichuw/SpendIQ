@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+
 import { Text } from '@/components/Themed';
 import { monthlyHomePlaceholder } from '@/src/mocks/monthly-home';
+import { addInsightReport } from '@/src/lib/insight-reports';
+import { buildSimplePdf } from '@/src/lib/pdf';
 
 type Timeframe = 'weekly' | 'monthly' | 'yearly';
 type BudgetStatus = 'on-track' | 'tight' | 'over';
 
 interface TimeframeMetrics {
-  label: string;
   spent: number;
   budget: number;
   compareToLastPeriodPct: number;
@@ -18,6 +21,7 @@ interface TimeframeMetrics {
 }
 
 const BASE = monthlyHomePlaceholder;
+const BASE_DATE = new Date(2026, 1, 1);
 const TIMEFRAME_OPTIONS: Array<{ id: Timeframe; label: string }> = [
   { id: 'weekly', label: 'Weekly' },
   { id: 'monthly', label: 'Monthly' },
@@ -26,7 +30,6 @@ const TIMEFRAME_OPTIONS: Array<{ id: Timeframe; label: string }> = [
 
 const METRICS: Record<Timeframe, TimeframeMetrics> = {
   weekly: {
-    label: 'This week',
     spent: 1036.4,
     budget: 1149.5,
     compareToLastPeriodPct: 13.9,
@@ -36,7 +39,6 @@ const METRICS: Record<Timeframe, TimeframeMetrics> = {
     visitsScale: 0.3,
   },
   monthly: {
-    label: 'This month',
     spent: BASE.summary.spentTotal,
     budget: BASE.summary.budgetTotal,
     compareToLastPeriodPct: 8.7,
@@ -46,7 +48,6 @@ const METRICS: Record<Timeframe, TimeframeMetrics> = {
     visitsScale: 1,
   },
   yearly: {
-    label: 'This year',
     spent: 46020.3,
     budget: 60000,
     compareToLastPeriodPct: 5.1,
@@ -70,19 +71,6 @@ function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-function toTitleCase(status: BudgetStatus): string {
-  if (status === 'on-track') return 'On Track';
-  if (status === 'tight') return 'Tight';
-  return 'Over';
-}
-
-function getStatus(spent: number, budget: number): BudgetStatus {
-  const ratio = budget <= 0 ? 0 : spent / budget;
-  if (ratio <= 0.85) return 'on-track';
-  if (ratio <= 1) return 'tight';
-  return 'over';
-}
-
 function darken(hex: string, amount = 0.08): string {
   const normalized = hex.replace('#', '');
   if (normalized.length !== 6) return hex;
@@ -97,12 +85,104 @@ function darken(hex: string, amount = 0.08): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+function toTitleCase(status: BudgetStatus): string {
+  if (status === 'on-track') return 'On Track';
+  if (status === 'tight') return 'Tight';
+  return 'Over';
+}
+
+function getStatus(spent: number, budget: number): BudgetStatus {
+  const ratio = budget <= 0 ? 0 : spent / budget;
+  if (ratio <= 0.85) return 'on-track';
+  if (ratio <= 1) return 'tight';
+  return 'over';
+}
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function normalizeDateForTimeframe(date: Date, timeframe: Timeframe): Date {
+  if (timeframe === 'weekly') return startOfWeek(date);
+  if (timeframe === 'monthly') return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(date.getFullYear(), 0, 1);
+}
+
+function shiftPeriod(date: Date, timeframe: Timeframe, direction: -1 | 1): Date {
+  const shifted = new Date(date);
+  if (timeframe === 'weekly') shifted.setDate(shifted.getDate() + direction * 7);
+  if (timeframe === 'monthly') shifted.setMonth(shifted.getMonth() + direction);
+  if (timeframe === 'yearly') shifted.setFullYear(shifted.getFullYear() + direction);
+  return normalizeDateForTimeframe(shifted, timeframe);
+}
+
+function getPeriodOffset(date: Date, timeframe: Timeframe): number {
+  if (timeframe === 'weekly') {
+    const base = startOfWeek(BASE_DATE).getTime();
+    const current = startOfWeek(date).getTime();
+    return Math.round((current - base) / (7 * 24 * 60 * 60 * 1000));
+  }
+
+  if (timeframe === 'monthly') {
+    return (date.getFullYear() - BASE_DATE.getFullYear()) * 12 + (date.getMonth() - BASE_DATE.getMonth());
+  }
+
+  return date.getFullYear() - BASE_DATE.getFullYear();
+}
+
+function formatPeriodLabel(date: Date, timeframe: Timeframe): string {
+  if (timeframe === 'weekly') {
+    const start = startOfWeek(date);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startLabel} - ${endLabel}`;
+  }
+
+  if (timeframe === 'monthly') {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  return `${date.getFullYear()}`;
+}
+
 export default function InsightsScreen() {
   const [timeframe, setTimeframe] = useState<Timeframe>('monthly');
+  const [periodDate, setPeriodDate] = useState<Date>(normalizeDateForTimeframe(BASE_DATE, 'monthly'));
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(BASE.chart[0]?.categoryId ?? null);
-  const metrics = METRICS[timeframe];
+  const [isExporting, setIsExporting] = useState(false);
+
+  const onChangeTimeframe = (nextTimeframe: Timeframe) => {
+    setTimeframe(nextTimeframe);
+    setPeriodDate((prev) => normalizeDateForTimeframe(prev, nextTimeframe));
+  };
+
+  const periodOffset = getPeriodOffset(periodDate, timeframe);
+  const trendMultiplier = Math.max(0.65, Math.min(1.55, 1 + periodOffset * 0.03));
+  const baseMetrics = METRICS[timeframe];
+
+  const metrics = useMemo(
+    () => ({
+      spent: baseMetrics.spent * trendMultiplier,
+      budget: baseMetrics.budget * (timeframe === 'yearly' ? Math.max(0.7, 1 + periodOffset * 0.01) : 1),
+      compareToLastPeriodPct: baseMetrics.compareToLastPeriodPct + periodOffset * 0.7,
+      compareToAveragePct: baseMetrics.compareToAveragePct + periodOffset * 0.5,
+      paceDeltaPct: baseMetrics.paceDeltaPct + periodOffset * 0.6,
+      chartScale: baseMetrics.chartScale * trendMultiplier,
+      visitsScale: baseMetrics.visitsScale * trendMultiplier,
+    }),
+    [baseMetrics, trendMultiplier, timeframe, periodOffset]
+  );
+
   const remaining = metrics.budget - metrics.spent;
   const status = getStatus(metrics.spent, metrics.budget);
+  const periodLabel = formatPeriodLabel(periodDate, timeframe);
 
   const chartData = useMemo(
     () =>
@@ -114,9 +194,7 @@ export default function InsightsScreen() {
   );
 
   const maxCategorySpend = chartData.reduce((max, category) => Math.max(max, category.spent), 0) || 1;
-  const topCategory = chartData.reduce((prev, current) =>
-    current.spent > prev.spent ? current : prev
-  );
+  const topCategory = chartData.reduce((prev, current) => (current.spent > prev.spent ? current : prev));
   const selectedCategory = chartData.find((category) => category.categoryId === selectedCategoryId) ?? chartData[0];
 
   const selectedSubcategories = useMemo(() => {
@@ -159,7 +237,8 @@ export default function InsightsScreen() {
         timeframe === 'weekly'
           ? `You're spending ${metrics.paceDeltaPct.toFixed(1)}% faster than usual this week.`
           : `Your current pace is ${metrics.paceDeltaPct.toFixed(1)}% above your normal ${timeframe} run rate.`,
-      action: 'Action: pause discretionary spend for 3 days and move restaurant purchases to grocery for the rest of this period.',
+      action:
+        'Action: pause discretionary spend for 3 days and move restaurant purchases to grocery for the rest of this period.',
     },
     {
       kind: 'alert',
@@ -181,9 +260,62 @@ export default function InsightsScreen() {
     },
   ] as const;
 
+  const onExportPdf = async () => {
+    try {
+      setIsExporting(true);
+      const timestamp = new Date().toLocaleString('en-US');
+      const lines = [
+        'SpendIQ Insights Report',
+        `Generated: ${timestamp}`,
+        `Timeframe: ${timeframe}`,
+        `Period: ${periodLabel}`,
+        '',
+        `Total spent: ${formatMoney(metrics.spent)}`,
+        `Budget: ${formatMoney(metrics.budget)}`,
+        `Remaining/Over: ${remaining >= 0 ? formatMoney(remaining) : `${formatMoney(Math.abs(remaining))} over`}`,
+        `Status: ${toTitleCase(status)}`,
+        '',
+        `Projection: ${projectionText}`,
+        '',
+        'Top merchants:',
+        ...topMerchants.slice(0, 5).map((merchant) => `- ${merchant.name}: ${formatMoney(merchant.totalSpent)} · ${merchant.visits} visits`),
+      ];
+
+      const pdfContent = buildSimplePdf(lines);
+      const safePeriod = periodLabel.replace(/[^a-zA-Z0-9-]/g, '_');
+      const filename = `insights-${timeframe}-${safePeriod}-${Date.now()}.pdf`;
+      const file = new File(Paths.document, filename);
+      file.create({ intermediates: true, overwrite: true });
+      file.write(pdfContent, { encoding: 'utf8' });
+      const fileUri = file.uri;
+
+      addInsightReport({
+        timeframe,
+        periodLabel,
+        summary: projectionText,
+        fileUri,
+      });
+
+      await Share.share({
+        title: 'SpendIQ Insights PDF',
+        message: `Saved ${filename}`,
+        url: fileUri,
+      });
+    } catch (error) {
+      Alert.alert('Export failed', 'Could not generate the insights PDF.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.pageTitle}>Insights</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.pageTitle}>Insights</Text>
+        <Pressable style={styles.exportButton} onPress={onExportPdf} disabled={isExporting}>
+          <Text style={styles.exportButtonText}>{isExporting ? 'Saving...' : 'Save PDF'}</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.timeframeRow}>
         {TIMEFRAME_OPTIONS.map((option) => {
@@ -192,18 +324,26 @@ export default function InsightsScreen() {
             <Pressable
               key={option.id}
               style={[styles.timeframePill, selected && styles.timeframePillSelected]}
-              onPress={() => setTimeframe(option.id)}>
-              <Text style={[styles.timeframeText, selected && styles.timeframeTextSelected]}>
-                {option.label}
-              </Text>
+              onPress={() => onChangeTimeframe(option.id)}>
+              <Text style={[styles.timeframeText, selected && styles.timeframeTextSelected]}>{option.label}</Text>
             </Pressable>
           );
         })}
       </View>
 
+      <View style={styles.periodPickerRow}>
+        <Pressable style={styles.periodArrow} onPress={() => setPeriodDate((prev) => shiftPeriod(prev, timeframe, -1))}>
+          <Text style={styles.periodArrowText}>‹</Text>
+        </Pressable>
+        <Text style={styles.periodLabel}>{periodLabel}</Text>
+        <Pressable style={styles.periodArrow} onPress={() => setPeriodDate((prev) => shiftPeriod(prev, timeframe, 1))}>
+          <Text style={styles.periodArrowText}>›</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.kpiCard}>
         <View style={styles.kpiHeader}>
-          <Text style={styles.cardLabel}>Total Spent ({metrics.label})</Text>
+          <Text style={styles.cardLabel}>Total Spent</Text>
           <View
             style={[
               styles.statusTag,
@@ -245,14 +385,13 @@ export default function InsightsScreen() {
                   },
                 ]}
               />
+              <Text style={styles.barLabel}>{category.categoryName}</Text>
             </Pressable>
           ))}
         </View>
         {selectedCategory ? (
           <View style={styles.subcategoryWrap}>
-            <Text style={styles.subcategoryHeader}>
-              {selectedCategory.categoryName} subcategories
-            </Text>
+            <Text style={styles.subcategoryHeader}>{selectedCategory.categoryName} subcategories</Text>
             {selectedSubcategories.map((line) => (
               <View style={styles.subcategoryRow} key={line.categoryId}>
                 <Text style={styles.subcategoryName}>{line.categoryName}</Text>
@@ -267,16 +406,14 @@ export default function InsightsScreen() {
         <Text style={styles.cardTitle}>Comparisons</Text>
         <Text style={styles.compareLine}>
           vs last {timeframe === 'weekly' ? 'week' : timeframe === 'monthly' ? 'month' : 'year'}:{' '}
-          <Text style={styles.compareValue}>+{metrics.compareToLastPeriodPct.toFixed(1)}%</Text>
+          <Text style={styles.compareValue}>{metrics.compareToLastPeriodPct >= 0 ? '+' : ''}{metrics.compareToLastPeriodPct.toFixed(1)}%</Text>
         </Text>
         <Text style={styles.compareLine}>
           vs average {timeframe === 'weekly' ? 'week' : timeframe === 'monthly' ? 'month' : 'year'}:{' '}
-          <Text style={styles.compareValue}>+{metrics.compareToAveragePct.toFixed(1)}%</Text>
+          <Text style={styles.compareValue}>{metrics.compareToAveragePct >= 0 ? '+' : ''}{metrics.compareToAveragePct.toFixed(1)}%</Text>
         </Text>
         {timeframe === 'weekly' ? (
-          <Text style={styles.weeklyNote}>
-            You're spending {metrics.paceDeltaPct.toFixed(1)}% faster than usual this week.
-          </Text>
+          <Text style={styles.weeklyNote}>You're spending {metrics.paceDeltaPct.toFixed(1)}% faster than usual this week.</Text>
         ) : null}
       </View>
 
@@ -285,10 +422,7 @@ export default function InsightsScreen() {
         {insightCards.map((insight) => (
           <View
             key={insight.title}
-            style={[
-              styles.insightItem,
-              insight.kind === 'alert' ? styles.insightAlert : styles.insightPositive,
-            ]}>
+            style={[styles.insightItem, insight.kind === 'alert' ? styles.insightAlert : styles.insightPositive]}>
             <Text style={styles.insightTitle}>{insight.title}</Text>
             <Text style={styles.insightBody}>{insight.body}</Text>
             <Text style={styles.insightAction}>{insight.action}</Text>
@@ -323,10 +457,26 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
     gap: 12,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   pageTitle: {
     fontSize: 30,
     fontWeight: '700',
     color: '#123B3A',
+  },
+  exportButton: {
+    backgroundColor: '#DDECEA',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  exportButtonText: {
+    color: '#123B3A',
+    fontWeight: '700',
+    fontSize: 13,
   },
   timeframeRow: {
     flexDirection: 'row',
@@ -351,6 +501,35 @@ const styles = StyleSheet.create({
   },
   timeframeTextSelected: {
     color: '#123B3A',
+  },
+  periodPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D5E4E2',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  periodArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF5F3',
+  },
+  periodArrowText: {
+    color: '#123B3A',
+    fontSize: 22,
+    lineHeight: 24,
+  },
+  periodLabel: {
+    color: '#123B3A',
+    fontSize: 15,
+    fontWeight: '700',
   },
   kpiCard: {
     backgroundColor: '#FFFFFF',
@@ -432,10 +611,6 @@ const styles = StyleSheet.create({
     width: '90%',
     minHeight: 8,
     borderRadius: 8,
-  },
-  barSelected: {
-    borderWidth: 2,
-    borderColor: '#173E3C',
   },
   barLabel: {
     fontSize: 11,

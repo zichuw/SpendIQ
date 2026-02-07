@@ -1,17 +1,145 @@
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+
 import { Text } from '@/components/Themed';
+import { InsightReport, listInsightReports } from '@/src/lib/insight-reports';
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 export default function ProfileScreen() {
+  const [reports, setReports] = useState<InsightReport[]>([]);
+
+  const refreshReports = useCallback(() => {
+    setReports(listInsightReports());
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshReports();
+    }, [refreshReports])
+  );
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Profile</Text>
-      <Text style={styles.body}>Profile and settings screen placeholder.</Text>
-    </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Saved Insight Reports</Text>
+        <Text style={styles.subtitle}>PDF exports from the Insights tab are listed here.</Text>
+
+        {reports.length === 0 ? (
+          <Text style={styles.emptyText}>No reports yet. Save one from Insights → Save PDF.</Text>
+        ) : (
+          reports.map((report) => (
+            <View key={report.id} style={styles.reportRow}>
+              <View style={styles.reportMeta}>
+                <Text style={styles.reportTitle}>
+                  {report.timeframe.toUpperCase()} · {report.periodLabel}
+                </Text>
+                <Text style={styles.reportSummary}>{report.summary}</Text>
+                <Text style={styles.reportTimestamp}>{formatDate(report.createdAt)}</Text>
+              </View>
+
+              <Pressable
+                style={styles.shareButton}
+                onPress={() =>
+                  Share.share({
+                    title: 'SpendIQ Insight Report',
+                    message: `Insight report (${report.periodLabel})`,
+                    url: report.fileUri,
+                  })
+                }>
+                <Text style={styles.shareButtonText}>Share</Text>
+              </Pressable>
+            </View>
+          ))
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
-  title: { fontSize: 24, fontWeight: '700', color: '#234041' },
-  body: { marginTop: 8, color: '#5A6D6B' },
+  screen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 120,
+    gap: 12,
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#123B3A',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D5E4E2',
+    padding: 14,
+    gap: 12,
+  },
+  cardTitle: {
+    color: '#123B3A',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  subtitle: {
+    color: '#587170',
+    fontSize: 13,
+  },
+  emptyText: {
+    color: '#587170',
+    fontSize: 14,
+  },
+  reportRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#E7EFEE',
+    paddingTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  reportMeta: {
+    flex: 1,
+    gap: 4,
+  },
+  reportTitle: {
+    color: '#123B3A',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reportSummary: {
+    color: '#355857',
+    fontSize: 13,
+  },
+  reportTimestamp: {
+    color: '#6A8281',
+    fontSize: 12,
+  },
+  shareButton: {
+    backgroundColor: '#DDECEA',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  shareButtonText: {
+    color: '#123B3A',
+    fontWeight: '700',
+    fontSize: 12,
+  },
 });
