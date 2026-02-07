@@ -1,5 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,6 +74,7 @@ function SpendingDonut() {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -89,6 +91,7 @@ export default function HomeScreen() {
     month: 'long',
     year: 'numeric',
   });
+  const openBudgetEditor = () => router.push('/budget-edit' as never);
 
   return (
     <>
@@ -107,16 +110,13 @@ export default function HomeScreen() {
           <Text style={styles.monthButtonText}>{monthLabel}</Text>
           <FontAwesome name="calendar-o" size={16} color="#111111" />
         </Pressable>
-        <Pressable style={styles.iconButton}>
-          <FontAwesome name="plus" size={16} color="#294C4A" />
+        <Pressable style={styles.iconButton} onPress={openBudgetEditor}>
+          <FontAwesome name="pencil" size={16} color="#294C4A" />
         </Pressable>
       </View>
 
       <View style={styles.budgetRow}>
         <Text style={styles.budgetLabel}>Monthly Budget: {formatMoney(data.summary.budgetTotal)}</Text>
-        <Pressable>
-          <FontAwesome name="pencil" size={14} color="#294C4A" />
-        </Pressable>
       </View>
 
       <View style={styles.card}>
@@ -364,9 +364,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   budgetLabel: {
-    color: '#111111',
-    fontSize: 22,
-    fontWeight: '700',
+    color: '#355756',
+    fontSize: 16,
+    fontWeight: '500',
   },
   card: {
     backgroundColor: '#FFFFFF',
