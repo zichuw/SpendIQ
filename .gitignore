@@ -1,0 +1,15 @@
+node_modules
+.pnpm-store
+
+# Expo / React Native
+.expo
+.expo-shared
+
+# Build artifacts
+dist
+coverage
+
+# Env files
+.env
+.env.*
+!.env.example

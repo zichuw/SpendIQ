@@ -1,15 +1,23 @@
 {
   "name": "spendiq",
   "private": true,
+  "packageManager": "pnpm@10.4.1",
   "workspaces": [
     "apps/mobile",
     "apps/server",
     "packages/*"
   ],
   "scripts": {
-    "mobile:start": "npm run start --workspace @spendiq/mobile",
-    "mobile:ios": "npm run ios --workspace @spendiq/mobile",
-    "mobile:android": "npm run android --workspace @spendiq/mobile",
-    "server:dev": "npm run dev --workspace @spendiq/server"
+    "pnpm:setup": "corepack enable && corepack prepare pnpm@10.4.1 --activate",
+    "bootstrap": "pnpm install",
+    "dev": "pnpm -r --parallel --filter @spendiq/mobile --filter @spendiq/server dev",
+    "mobile:dev": "pnpm --filter @spendiq/mobile dev",
+    "mobile:start": "pnpm --filter @spendiq/mobile start",
+    "mobile:ios": "pnpm --filter @spendiq/mobile ios",
+    "mobile:android": "pnpm --filter @spendiq/mobile android",
+    "mobile:web": "pnpm --filter @spendiq/mobile web",
+    "server:dev": "pnpm --filter @spendiq/server dev",
+    "server:start": "pnpm --filter @spendiq/server start",
+    "typecheck": "pnpm -r typecheck"
   }
 }
