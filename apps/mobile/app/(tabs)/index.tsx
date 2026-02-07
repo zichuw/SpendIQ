@@ -74,6 +74,9 @@ function SpendingDonut() {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
   const [selectedMonthDate, setSelectedMonthDate] = useState(new Date(2026, 1, 1));
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(selectedMonthDate.getFullYear());
@@ -101,7 +104,7 @@ export default function HomeScreen() {
         <Pressable
           style={styles.monthButton}
           onPress={() => {
-            setPickerYear(selectedMonthDate.getFullYear());
+            setPickerYear(Math.min(selectedMonthDate.getFullYear(), currentYear));
             setMonthPickerVisible(true);
           }}>
           <Text style={styles.monthButtonText}>{monthLabel}</Text>
@@ -194,8 +197,9 @@ export default function HomeScreen() {
             </Pressable>
             <Text style={styles.monthModalYear}>{pickerYear}</Text>
             <Pressable
-              style={styles.yearArrowButton}
-              onPress={() => setPickerYear((year) => year + 1)}>
+              style={[styles.yearArrowButton, pickerYear >= currentYear && styles.disabledButton]}
+              disabled={pickerYear >= currentYear}
+              onPress={() => setPickerYear((year) => Math.min(year + 1, currentYear))}>
               <FontAwesome name="chevron-right" size={14} color="#294C4A" />
             </Pressable>
           </View>
@@ -205,11 +209,18 @@ export default function HomeScreen() {
               const isSelected =
                 selectedMonthDate.getFullYear() === pickerYear &&
                 selectedMonthDate.getMonth() === monthIndex;
+              const isFutureMonth =
+                pickerYear > currentYear || (pickerYear === currentYear && monthIndex > currentMonth);
 
               return (
                 <Pressable
                   key={monthName}
-                  style={[styles.monthCell, isSelected && styles.monthCellSelected]}
+                  style={[
+                    styles.monthCell,
+                    isSelected && styles.monthCellSelected,
+                    isFutureMonth && styles.disabledButton,
+                  ]}
+                  disabled={isFutureMonth}
                   onPress={() => {
                     setSelectedMonthDate(new Date(pickerYear, monthIndex, 1));
                     setMonthPickerVisible(false);
@@ -337,6 +348,9 @@ const styles = StyleSheet.create({
   },
   monthCellTextSelected: {
     color: '#1D3E3C',
+  },
+  disabledButton: {
+    opacity: 0.4,
   },
   iconButton: {
     width: 36,

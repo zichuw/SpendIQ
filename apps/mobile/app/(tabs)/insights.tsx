@@ -153,17 +153,30 @@ function formatPeriodLabel(date: Date, timeframe: Timeframe): string {
   return `${date.getFullYear()}`;
 }
 
+function getCurrentPeriodDate(timeframe: Timeframe): Date {
+  return normalizeDateForTimeframe(new Date(), timeframe);
+}
+
+function clampToCurrentPeriod(date: Date, timeframe: Timeframe): Date {
+  const normalized = normalizeDateForTimeframe(date, timeframe);
+  const current = getCurrentPeriodDate(timeframe);
+  return normalized.getTime() > current.getTime() ? current : normalized;
+}
+
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
   const [timeframe, setTimeframe] = useState<Timeframe>('monthly');
-  const [periodDate, setPeriodDate] = useState<Date>(normalizeDateForTimeframe(BASE_DATE, 'monthly'));
+  const [periodDate, setPeriodDate] = useState<Date>(getCurrentPeriodDate('monthly'));
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(BASE.chart[0]?.categoryId ?? null);
   const [isExporting, setIsExporting] = useState(false);
 
   const onChangeTimeframe = (nextTimeframe: Timeframe) => {
     setTimeframe(nextTimeframe);
-    setPeriodDate((prev) => normalizeDateForTimeframe(prev, nextTimeframe));
+    setPeriodDate((prev) => clampToCurrentPeriod(prev, nextTimeframe));
   };
+
+  const currentPeriodDate = getCurrentPeriodDate(timeframe);
+  const canGoNextPeriod = periodDate.getTime() < currentPeriodDate.getTime();
 
   const periodOffset = getPeriodOffset(periodDate, timeframe);
   const trendMultiplier = Math.max(0.65, Math.min(1.55, 1 + periodOffset * 0.03));
@@ -342,7 +355,10 @@ export default function InsightsScreen() {
           <Text style={styles.periodArrowText}>‹</Text>
         </Pressable>
         <Text style={styles.periodLabel}>{periodLabel}</Text>
-        <Pressable style={styles.periodArrow} onPress={() => setPeriodDate((prev) => shiftPeriod(prev, timeframe, 1))}>
+        <Pressable
+          style={[styles.periodArrow, !canGoNextPeriod && styles.disabledArrow]}
+          disabled={!canGoNextPeriod}
+          onPress={() => setPeriodDate((prev) => clampToCurrentPeriod(shiftPeriod(prev, timeframe, 1), timeframe))}>
           <Text style={styles.periodArrowText}>›</Text>
         </Pressable>
       </View>
@@ -536,6 +552,9 @@ const styles = StyleSheet.create({
     color: '#123B3A',
     fontSize: 22,
     lineHeight: 24,
+  },
+  disabledArrow: {
+    opacity: 0.4,
   },
   periodLabel: {
     color: '#123B3A',
