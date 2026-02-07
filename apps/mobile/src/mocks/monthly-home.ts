@@ -1,0 +1,83 @@
+export interface MonthlyHomeData {
+  month: string;
+  periodStart: string;
+  periodEnd: string;
+  currency: 'USD';
+  budgetId: number;
+  summary: {
+    budgetTotal: number;
+    spentTotal: number;
+    remaining: number;
+    spentPct: number;
+  };
+  chart: Array<{
+    categoryId: number;
+    categoryName: string;
+    spent: number;
+    color: string;
+  }>;
+  lines: Array<{
+    categoryId: number;
+    categoryName: string;
+    parentCategoryName?: string;
+    planned: number;
+    spent: number;
+    remaining: number;
+    progressPct: number;
+  }>;
+  sync: {
+    lastTransactionSyncAt: string | null;
+  };
+}
+
+export const monthlyHomePlaceholder: MonthlyHomeData = {
+  month: '2026-02',
+  periodStart: '2026-02-01',
+  periodEnd: '2026-02-28',
+  currency: 'USD',
+  budgetId: 1,
+  summary: {
+    budgetTotal: 5000,
+    spentTotal: 3750.5,
+    remaining: 1249.5,
+    spentPct: 75.01,
+  },
+  chart: [
+    { categoryId: 2, categoryName: 'Fixed', spent: 1720, color: '#4A6C8C' },
+    { categoryId: 3, categoryName: 'Everyday', spent: 860.5, color: '#6FA8DC' },
+    { categoryId: 4, categoryName: 'Lifestyle', spent: 980, color: '#9FC5A8' },
+    { categoryId: 5, categoryName: 'Miscellaneous', spent: 190, color: '#B7B7B7' },
+  ],
+  lines: [
+    {
+      categoryId: 10,
+      categoryName: 'Restaurants',
+      parentCategoryName: 'Lifestyle',
+      planned: 600,
+      spent: 420,
+      remaining: 180,
+      progressPct: 70,
+    },
+    {
+      categoryId: 11,
+      categoryName: 'Personal Shopping',
+      parentCategoryName: 'Lifestyle',
+      planned: 300,
+      spent: 240,
+      remaining: 60,
+      progressPct: 80,
+    },
+    {
+      categoryId: 12,
+      categoryName: 'Subscriptions',
+      parentCategoryName: 'Lifestyle',
+      planned: 120,
+      spent: 95.99,
+      remaining: 24.01,
+      progressPct: 79.99,
+    },
+  ],
+  sync: {
+    lastTransactionSyncAt: '2026-02-07T18:20:00Z',
+  },
+};
