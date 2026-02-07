@@ -34,6 +34,7 @@ router.get("/monthly", async (req, res) => {
 
   try {
     const { periodStart, periodEnd } = getMonthBounds(month);
+    let budgetId: number | null = null;
 
     // Budget for this month (unique on user_id, period_start)
     const budgetRes = await pool.query(
@@ -52,6 +53,7 @@ router.get("/monthly", async (req, res) => {
 
     if (budgetRes.rowCount !== 0) {
       const budget_id = budgetRes.rows[0].id;
+      budgetId = Number(budget_id);
       const linesRes = await pool.query(
         `SELECT bl.category_id, bl.planned_amount,
                 c.name AS category_name, c.color_hex,
@@ -107,7 +109,10 @@ router.get("/monthly", async (req, res) => {
       lastTransactionSyncAt
     );
 
-    res.json(payload);
+    res.json({
+      ...payload,
+      budgetId,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Error fetching monthly home:", message);

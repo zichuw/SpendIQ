@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { InsightReport, listInsightReports } from '@/src/lib/insight-reports';
+import { ApiProfileAccount, getDefaultUserId, getProfile } from '@/src/lib/api';
 
 type ProfileTab = 'accounts' | 'settings';
 type AccountStatus = 'connected' | 'needs re-auth' | 'sync issue';
@@ -18,36 +19,6 @@ interface LinkedAccount {
   balance: number;
   status: AccountStatus;
 }
-
-const LINKED_ACCOUNTS: LinkedAccount[] = [
-  {
-    id: '1',
-    institution: 'Chase',
-    nickname: 'Visa',
-    type: 'credit',
-    maskedNumber: '**** 4443',
-    balance: 1384.72,
-    status: 'connected',
-  },
-  {
-    id: '2',
-    institution: 'Bank of America',
-    nickname: 'Daily Spend',
-    type: 'checking',
-    maskedNumber: '**** 1038',
-    balance: 5240.09,
-    status: 'needs re-auth',
-  },
-  {
-    id: '3',
-    institution: 'Ally',
-    nickname: 'Emergency Fund',
-    type: 'savings',
-    maskedNumber: '**** 8881',
-    balance: 9700.55,
-    status: 'sync issue',
-  },
-];
 
 function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
@@ -78,18 +49,41 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('accounts');
   const [showBalances, setShowBalances] = useState(true);
   const [reports, setReports] = useState<InsightReport[]>([]);
+  const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
+  const [timezone, setTimezone] = useState('America/New_York');
+  const [currencyCode, setCurrencyCode] = useState('USD');
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const userId = getDefaultUserId();
 
   const refreshReports = useCallback(() => {
     setReports(listInsightReports());
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    setLoadingAccounts(true);
+    setAccountsError(null);
+
+    try {
+      const data = await getProfile(userId);
+      setAccounts((data.accounts ?? []).map((account: ApiProfileAccount) => ({ ...account })));
+      setTimezone(data.settings.timezone);
+      setCurrencyCode(data.settings.currencyCode);
+    } catch (err) {
+      setAccountsError(err instanceof Error ? err.message : 'Unable to load profile data');
+    } finally {
+      setLoadingAccounts(false);
+    }
+  }, [userId]);
+
   useFocusEffect(
     useCallback(() => {
       refreshReports();
-    }, [refreshReports])
+      void refreshProfile();
+    }, [refreshProfile, refreshReports])
   );
 
-  const accountCountText = useMemo(() => `${LINKED_ACCOUNTS.length} linked accounts`, []);
+  const accountCountText = useMemo(() => `${accounts.length} linked accounts`, [accounts.length]);
 
   const handleChangePassword = () => {
     Alert.alert('Change Password', 'Password update flow will be connected next.');
@@ -138,7 +132,23 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
 
-            {LINKED_ACCOUNTS.map((account) => {
+            {loadingAccounts ? (
+              <View style={styles.accountCard}>
+                <ActivityIndicator color="#123B3A" />
+                <Text style={styles.emptyText}>Loading linked accounts...</Text>
+              </View>
+            ) : accountsError ? (
+              <View style={styles.accountCard}>
+                <Text style={styles.emptyText}>Could not load accounts: {accountsError}</Text>
+                <Pressable style={styles.toggleButton} onPress={() => void refreshProfile()}>
+                  <Text style={styles.toggleText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : accounts.length === 0 ? (
+              <View style={styles.accountCard}>
+                <Text style={styles.emptyText}>No linked accounts found.</Text>
+              </View>
+            ) : accounts.map((account) => {
               const status = getStatusStyles(account.status);
               const initials = account.institution
                 .split(' ')
@@ -181,6 +191,12 @@ export default function ProfileScreen() {
           </>
         ) : (
           <>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Preferences</Text>
+              <Text style={styles.subtitle}>Timezone: {timezone}</Text>
+              <Text style={styles.subtitle}>Currency: {currencyCode}</Text>
+            </View>
+
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Account Settings</Text>
               <Pressable style={styles.settingRow} onPress={handleChangePassword}>
